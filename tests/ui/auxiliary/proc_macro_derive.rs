@@ -243,3 +243,33 @@ pub fn derive_double_parens(_: TokenStream) -> TokenStream {
         }
     }
 }
+
+// This must construct the redundant fields using the input struct's
+// identifiers, so that the fields' spans are from outside this macro to be a
+// reasonable approximation of real use.
+#[proc_macro_derive(ConstructStructWithRedundantFields)]
+pub fn derive_construct_struct_with_redundant_fields(input: TokenStream) -> TokenStream {
+    let di = syn::parse_macro_input!(input as syn::DeriveInput);
+    let syn::DeriveInput {
+        data:
+            syn::Data::Struct(syn::DataStruct {
+                fields: syn::Fields::Named(syn::FieldsNamed { named: ref fields, .. }),
+                ..
+            }),
+        ref ident,
+        ..
+    } = di
+    else {
+        panic!("only supports structs with named fields");
+    };
+
+    let field_names: Vec<_> = fields.iter().map(|f| f.ident.as_ref().expect("named field")).collect();
+    let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect();
+
+    quote::quote! {
+        pub fn construct_struct_with_redundant_fields(#(#field_names: #field_types),*) -> #ident {
+            #ident { #(#field_names: #field_names),* }
+        }
+    }
+    .into()
+}
